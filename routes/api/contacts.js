@@ -3,23 +3,23 @@ const express = require("express");
 const router = express.Router();
 
 router.get("/", async (req, res, next) => {
-  res.json({ message: "Home work start" });
+  res.json({ message: "Home goooo" });
 });
 
 router.get("/:contactId", async (req, res, next) => {
-  res.json({ message: "test" });
+  res.json({ message: "test11111&" });
 });
 
 router.post("/", async (req, res, next) => {
-  res.json({ message: "gogo" });
+  res.json({ message: "aaaaaa" });
 });
 
 router.delete("/:contactId", async (req, res, next) => {
-  res.json({ message: "go" });
+  res.json({ message: "test" });
 });
 
 router.put("/:contactId", async (req, res, next) => {
-  res.json({ message: "test ok" });
+  res.json({ message: "gogo" });
 });
 
 module.exports = router;
