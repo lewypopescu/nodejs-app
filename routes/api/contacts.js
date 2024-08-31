@@ -1,13 +1,6 @@
 import express from "express";
 import Joi from "joi";
-
-import {
-  listContacts,
-  getContactById,
-  addContact,
-  removeContact,
-  updateContact,
-} from "../../models/contacts.js";
+import Contact from "../../models/contacts.model.js";
 
 const contactSchema = Joi.object({
   name: Joi.string().required(),
@@ -21,7 +14,7 @@ const router = express.Router();
 
 router.get("/", async (req, res, next) => {
   try {
-    const contacts = await listContacts();
+    const contacts = await Contact.find();
     res.status(200).json(contacts);
   } catch (error) {
     next(error);
@@ -31,7 +24,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:contactId", async (req, res, next) => {
   try {
     const { contactId } = req.params;
-    const contact = await getContactById(contactId);
+    const contact = await Contact.findById(contactId);
     if (contact) {
       res.status(200).json(contact);
     } else {
@@ -48,7 +41,8 @@ router.post("/", async (req, res, next) => {
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
     }
-    const contact = await addContact(req.body);
+    const contact = new Contact(req.body);
+    await contact.save();
     res.status(201).json(contact);
   } catch (error) {
     next(error);
@@ -58,7 +52,7 @@ router.post("/", async (req, res, next) => {
 router.delete("/:contactId", async (req, res, next) => {
   try {
     const { contactId } = req.params;
-    const contact = await removeContact(contactId);
+    const contact = await Contact.findByIdAndDelete(contactId);
     if (contact) {
       res.status(200).json({ message: "Contact Deleted" });
     } else {
@@ -76,7 +70,11 @@ router.put("/:contactId", async (req, res, next) => {
       return res.status(400).json({ message: error.details[0].message });
     }
     const { contactId } = req.params;
-    const updatedContact = await updateContact(contactId, req.body);
+    const updatedContact = await Contact.findByIdAndUpdate(
+      contactId,
+      req.body,
+      { new: true }
+    );
     if (updatedContact) {
       res.status(200).json(updatedContact);
     } else {
