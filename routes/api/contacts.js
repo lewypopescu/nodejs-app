@@ -3,11 +3,14 @@ import Joi from "joi";
 import Contact from "../../models/contacts.model.js";
 
 const contactSchema = Joi.object({
-  name: Joi.string().required(),
+  name: Joi.string().required().messages({
+    "any.required": "Set name for contact",
+  }),
   email: Joi.string().email().required(),
   phone: Joi.string()
     .pattern(/^[0-9]+$/)
     .required(),
+  favorite: Joi.boolean().default(false),
 });
 
 const router = express.Router();
@@ -15,6 +18,7 @@ const router = express.Router();
 router.get("/", async (req, res, next) => {
   try {
     const contacts = await Contact.find();
+    console.log(contacts);
     res.status(200).json(contacts);
   } catch (error) {
     next(error);
@@ -41,6 +45,7 @@ router.post("/", async (req, res, next) => {
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
     }
+
     const contact = new Contact(req.body);
     await contact.save();
     res.status(201).json(contact);
@@ -69,6 +74,7 @@ router.put("/:contactId", async (req, res, next) => {
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
     }
+
     const { contactId } = req.params;
     const updatedContact = await Contact.findByIdAndUpdate(
       contactId,

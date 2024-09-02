@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
-
 import app from "./app.js";
-
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -10,10 +8,7 @@ mongoose.Promise = global.Promise;
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.DB_HOST, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(process.env.DB_HOST);
     console.log("MongoDB connected successfully");
   } catch (error) {
     console.error("MongoDB connection failed:", error.message);
