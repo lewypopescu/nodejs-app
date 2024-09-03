@@ -1,8 +1,5 @@
 import mongoose from "mongoose";
 import app from "./app.js";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 mongoose.Promise = global.Promise;
 
