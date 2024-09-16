@@ -1,29 +1,27 @@
-import nodemailer from "nodemailer";
+import mailgun from "mailgun-js";
+import dotenv from "dotenv";
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.office365.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.OUTLOOK_USER,
-    pass: process.env.OUTLOOK_PASS,
-  },
-  tls: {
-    ciphers: "SSLv3",
-  },
+dotenv.config();
+
+const mg = mailgun({
+  apiKey: process.env.MAILGUN_API_KEY,
+  domain: process.env.MAILGUN_DOMAIN,
 });
 
 export const sendEmail = async (to, subject, text, html) => {
   try {
-    const info = await transporter.sendMail({
-      from: process.env.OUTLOOK_USER,
+    const data = {
+      from: `Your App <noreply@${process.env.MAILGUN_DOMAIN}>`,
       to,
       subject,
       text,
       html,
-    });
-    console.log("Send email:", info.response);
+    };
+
+    const body = await mg.messages().send(data);
+
+    console.log("Email:", body);
   } catch (error) {
-    console.log(error, error.message);
+    console.log("Error:", error.message);
   }
 };

@@ -112,11 +112,14 @@ router.post("/signup", async (req, res, next) => {
 router.get("/verify/:verificationToken", async (req, res, next) => {
   try {
     const { verificationToken } = req.params;
-
     const user = await User.findOne({ verificationToken });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.verify) {
+      return res.status(400).json({ message: "User is already verified" });
     }
 
     user.verificationToken = null;
