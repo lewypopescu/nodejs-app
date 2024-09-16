@@ -1,11 +1,15 @@
 import express from "express";
-import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import gravatar from "gravatar";
 import multer from "multer";
 import fs from "fs/promises";
 import path from "path";
 import { Jimp } from "jimp";
+import bcrypt from "bcrypt";
+import crypto from "crypto";
+
+import { sendEmail } from "../../sendEmail.js";
+
 import User from "../../models/users.model.js";
 
 const router = express.Router();
@@ -55,15 +59,20 @@ router.post("/signup", async (req, res, next) => {
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(409).json({ message: "Conflict Error: Email in use." });
+      return res
+        .status(409)
+        .json({ message: "Conflict Error: Email is already in use." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const avatarURLSet = gravatar.url(email, {
       s: "200",
       r: "pg",
       d: "identicon",
     });
+
+    const verificationToken = crypto.randomBytes(32).toString("hex");
 
     const newUser = new User({
       email,
@@ -71,20 +80,125 @@ router.post("/signup", async (req, res, next) => {
       subscription: "starter",
       token: null,
       avatarURL: avatarURLSet,
+      verify: false,
+      verificationToken,
     });
 
     await newUser.save();
+
+    const verificationLink = `${process.env.BASE_URL}/auth/verify/${verificationToken}`;
+
+    await sendEmail(
+      newUser.email,
+      "Verify your email address",
+      `Click the following link to verify your email: ${verificationLink}`,
+      `<p>Click <a href="${verificationLink}">here</a> to verify your email address.</p>`
+    );
 
     res.status(201).json({
       user: {
         email: newUser.email,
         subscription: newUser.subscription,
-        avatarURL: newUser.avatarURL,
+        avatarURL: newUser.avatarURLSet,
       },
-      message: "Registration successful",
+      message:
+        "User registered successfully. Please check your email to verify your account.",
     });
   } catch (error) {
     next(error);
+  }
+});
+
+router.get("/verify/:verificationToken", async (req, res, next) => {
+  try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.verify) {
+      return res.status(400).json({ message: "User is already verified" });
+    }
+
+    user.verificationToken = null;
+    user.verify = true;
+    await user.save();
+
+    res.status(200).json({ message: "Verification successful" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/login", async (req, res, next) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return res.status(401).json({ message: "Email or password is wrong" });
+  }
+
+  const isPasswordCorrect = await bcrypt.compare(password, user.password);
+  if (!isPasswordCorrect) {
+    return res.status(401).json({ message: "Email or password is wrong" });
+  }
+
+  try {
+    const payload = {
+      id: user._id,
+      email: user.email,
+      subscription: user.subscription,
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+    user.token = token;
+    await user.save();
+
+    res.status(200).json({
+      token,
+      user: {
+        email: user.email,
+        subscription: user.subscription,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/logout", auth, async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    user.token = null;
+    await user.save();
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/current", auth, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    res.status(200).json({
+      email: user.email,
+      subscription: user.subscription,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -116,5 +230,5 @@ router.patch(
   }
 );
 
-export default router;
 export { auth };
+export default router;
