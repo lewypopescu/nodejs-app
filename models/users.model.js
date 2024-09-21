@@ -29,7 +29,7 @@ const userSchema = mongoose.Schema({
   },
   verificationToken: {
     type: String,
-    required: [true, "Verify token is required"],
+    default: null,
   },
 });
 

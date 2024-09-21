@@ -112,10 +112,11 @@ router.post("/signup", async (req, res, next) => {
 router.get("/verify/:verificationToken", async (req, res, next) => {
   try {
     const { verificationToken } = req.params;
+
     const user = await User.findOne({ verificationToken });
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Invalid or expired token" });
     }
 
     if (user.verify) {
@@ -124,9 +125,59 @@ router.get("/verify/:verificationToken", async (req, res, next) => {
 
     user.verificationToken = null;
     user.verify = true;
+
     await user.save();
 
-    res.status(200).json({ message: "Verification successful" });
+    await sendEmail(
+      user.email,
+      "Account Verified",
+      "Your account has been successfully verified!",
+      `<p>Hi ${user.email},<br>Your account is now verified. Thank you for verifying!</p><p>Your account has been successfully verified!</p>`
+    );
+
+    res
+      .status(200)
+      .json({ message: "Verification successful, confirmation email sent" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/resend-verification", async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Missing required field email" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.verify) {
+      return res
+        .status(400)
+        .json({ message: "Verification has already been passed" });
+    }
+
+    const verificationToken =
+      user.verificationToken || crypto.randomBytes(32).toString("hex");
+    user.verificationToken = verificationToken;
+    await user.save();
+
+    const verificationLink = `${process.env.BASE_URL}/auth/verify/${verificationToken}`;
+
+    await sendEmail(
+      user.email,
+      "Email verification",
+      "Please verify your email address.",
+      `<p>Click <a href="${verificationLink}">here</a> to verify your email.</p>`
+    );
+
+    res.status(200).json({ message: "Verification email sent" });
   } catch (error) {
     next(error);
   }
@@ -134,8 +185,8 @@ router.get("/verify/:verificationToken", async (req, res, next) => {
 
 router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
 
+  const user = await User.findOne({ email });
   if (!user) {
     return res.status(401).json({ message: "Email or password is wrong" });
   }
@@ -143,6 +194,13 @@ router.post("/login", async (req, res, next) => {
   const isPasswordCorrect = await bcrypt.compare(password, user.password);
   if (!isPasswordCorrect) {
     return res.status(401).json({ message: "Email or password is wrong" });
+  }
+
+  if (!user.verify) {
+    return res.status(403).json({
+      message:
+        "Email not verified. Please verify your email before logging in.",
+    });
   }
 
   try {
@@ -155,6 +213,7 @@ router.post("/login", async (req, res, next) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
+
     user.token = token;
     await user.save();
 
@@ -180,7 +239,7 @@ router.get("/logout", auth, async (req, res, next) => {
     user.token = null;
     await user.save();
 
-    res.status(204).send();
+    res.status(200).json({ message: "Logout successful" });
   } catch (error) {
     next(error);
   }
@@ -231,4 +290,5 @@ router.patch(
 );
 
 export { auth };
+
 export default router;
